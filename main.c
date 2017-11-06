@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <cassandra.h>
 #include "config.h"
 
 
@@ -20,6 +21,7 @@ cli_help()
 {
 	return;
 }
+
 
 void
 cli()
