@@ -1,23 +1,21 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <cassandra.h>
-#include "config.h"
+#include <stdio.h>
+#include <string.h>
+#include <iostream>
+using namespace std;
 
+string keyspace = "excelsior";
+string table = "test";
 
-char *readline(char *prompt);
-
-static int tty = 0;
-
-static void
-cli_show()
-{
+int main(int argc, char* argv[]) {
   /* Setup and connect to cluster */
   CassFuture* connect_future = NULL;
   CassCluster* cluster = cass_cluster_new();
   CassSession* session = cass_session_new();
   char* hosts = "127.0.0.1";
+  if (argc > 1) {
+    hosts = argv[1];
+  }
 
   /* Add contact points */
   cass_cluster_set_contact_points(cluster, hosts);
@@ -29,9 +27,11 @@ cli_show()
     CassFuture* close_future = NULL;
 
     /* Build statement and execute query */
-//    const char* query = "SELECT release_version FROM system.local";
-    const char* query = "select * from system_schema.keyspaces";
-    CassStatement* statement = cass_statement_new(query, 0);
+    string key = "first";
+    string value = "tester2";
+    string query = "INSERT INTO " + keyspace + "." + table + " ( " + key + " ) VALUES ( '" + value + "' )";
+    cout << query << endl;
+    CassStatement* statement = cass_statement_new(query.c_str(), 0);
 
     CassFuture* result_future = cass_session_execute(session, statement);
 
@@ -80,89 +80,4 @@ cli_show()
   cass_session_free(session);
 
   return 0;
-}
-
-
-static void
-cli_about()
-{
-	printf("You executed a command!\n");
-}
-
-static void
-cli_help()
-{
-	return;
-}
-
-
-void
-cli()
-{
-	char *cmdline = NULL;
-	char cmd[BUFSIZE], prompt[BUFSIZE];
-	int pos;
-
-	tty = isatty(STDIN_FILENO);
-	if (tty)
-		cli_about();
-
-	/* Main command line loop */
-	for (;;) {
-		if (cmdline != NULL) {
-			free(cmdline);
-			cmdline = NULL;
-		}
-		memset(prompt, 0, BUFSIZE);
-		sprintf(prompt, "cassandra> ");
-
-		if (tty)
-			cmdline = readline(prompt);
-		else
-			cmdline = readline("");
-
-		if (cmdline == NULL)
-			continue;
-
-		if (strlen(cmdline) == 0)
-			continue;
-
-		if (!tty)
-			printf("%s\n", cmdline);
-
-		if (strcmp(cmdline, "?") == 0) {
-			cli_help();
-			continue;
-		}
-		if (strcmp(cmdline, "quit") == 0 ||
-		    strcmp(cmdline, "q") == 0 || strcmp(cmdline, "exit") == 0)
-			break;
-
-		memset(cmd, 0, BUFSIZE);
-		pos = 0;
-		nextarg(cmdline, &pos, " ", cmd);
-
-		if (strcmp(cmd, "about") == 0 || strcmp(cmd, "a") == 0) {
-          nextarg(cmdline, &pos, " ", cmd);
-          if(strcmp(cmd, "more") == 0){
-            printf("HEYO\n");
-          }
-			cli_about();
-			continue;
-
-		}
-		if (strcmp(cmd, "show") == 0 || strcmp(cmd, "a") == 0) {
-			cli_show();
-			continue;
-
-		}
-
-	}
-}
-
-//int main(int argc, char**argv)
-int main(int argc, char* argv[])
-{
-	cli();
-	exit(0);
 }
