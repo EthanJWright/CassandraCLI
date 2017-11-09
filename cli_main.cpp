@@ -16,24 +16,39 @@ using namespace std;
 string keyspace = "not set";
 string table = "not set";
 char* hosts = (char *)"127.0.0.1";
+/* Setup and connect to cluster */
+CassFuture* connect_future = NULL;
+CassCluster* cluster = NULL;
+CassSession* session = NULL;
+CassFuture* close_future = NULL;
 
-void show(){
-  cout<<"Keyspace List: "<<endl;
-  cout<<"----------------"<<endl;
-  /* Setup and connect to cluster */
-  CassFuture* connect_future = NULL;
-  CassCluster* cluster = cass_cluster_new();
-  CassSession* session = cass_session_new();
-
+void setup(){
+  cluster = cass_cluster_new();
+  session = cass_session_new();
   /* Add contact points */
   cass_cluster_set_contact_points(cluster, hosts);
-
   /* Provide the cluster object as configuration to connect the session */
   connect_future = cass_session_connect(session, cluster);
+}
+void error(CassFuture* future){
+    /* Handle error */
+    const char* message;
+    size_t message_length;
+    cass_future_error_message(future, &message, &message_length);
+    fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+}
+void close(){
+  /* Close the session */
+  close_future = cass_session_close(session);
+  cass_future_wait(close_future);
+  cass_future_free(close_future);
+}
 
+void show(){
+  setup();
+  cout<<"Keyspace List: "<<endl;
+  cout<<"----------------"<<endl;
   if (cass_future_error_code(connect_future) == CASS_OK) {
-    CassFuture* close_future = NULL;
-
     /* Build statement and execute query */
     const char* query = "select * from system_schema.keyspaces";
     CassStatement* statement = cass_statement_new(query, 0);
@@ -58,49 +73,21 @@ void show(){
       }
       cass_result_free(result);
     } else {
-      /* Handle error */
-      const char* message;
-      size_t message_length;
-      cass_future_error_message(result_future, &message, &message_length);
-      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+      error(result_future);
     }
-
     cass_statement_free(statement);
     cass_future_free(result_future);
-
-    /* Close the session */
-    close_future = cass_session_close(session);
-    cass_future_wait(close_future);
-    cass_future_free(close_future);
+    close();
   } else {
-    /* Handle error */
-    const char* message;
-    size_t message_length;
-    cass_future_error_message(connect_future, &message, &message_length);
-    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+    error(connect_future);
   }
-
-  cass_future_free(connect_future);
-  cass_cluster_free(cluster);
-  cass_session_free(session);
 }
 
 void list(){
+  setup();
   cout<<"Tables: "<<endl;
   cout<<"-----------------"<<endl;
-  /* Setup and connect to cluster */
-  CassFuture* connect_future = NULL;
-  CassCluster* cluster = cass_cluster_new();
-  CassSession* session = cass_session_new();
-  /* Add contact points */
-  cass_cluster_set_contact_points(cluster, hosts);
-
-  /* Provide the cluster object as configuration to connect the session */
-  connect_future = cass_session_connect(session, cluster);
-
   if (cass_future_error_code(connect_future) == CASS_OK) {
-    CassFuture* close_future = NULL;
-
     /* Build statement and execute query */
     if(keyspace == "not set"){
       cout<<"Keyspace not defined"<<endl;
@@ -140,26 +127,14 @@ void list(){
       }
       cass_result_free(result);
     } else {
-      /* Handle error */
-      const char* message;
-      size_t message_length;
-      cass_future_error_message(result_future, &message, &message_length);
-      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+      error(result_future);
     }
 
     cass_statement_free(statement);
     cass_future_free(result_future);
-
-    /* Close the session */
-    close_future = cass_session_close(session);
-    cass_future_wait(close_future);
-    cass_future_free(close_future);
+    close();
   } else {
-    /* Handle error */
-    const char* message;
-    size_t message_length;
-    cass_future_error_message(connect_future, &message, &message_length);
-    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+    error(connect_future);
   }
 
   cass_future_free(connect_future);
@@ -173,21 +148,10 @@ void use(string key, string tab){
   cout<<response<<endl;
 }
 void get(string key){
+  setup();
   cout<<"Values for key: "<<endl;
   cout<<"--------------"<<endl;
-  /* Setup and connect to cluster */
-  CassFuture* connect_future = NULL;
-  CassCluster* cluster = cass_cluster_new();
-  CassSession* session = cass_session_new();
-  /* Add contact points */
-  cass_cluster_set_contact_points(cluster, hosts);
-
-  /* Provide the cluster object as configuration to connect the session */
-  connect_future = cass_session_connect(session, cluster);
-
   if (cass_future_error_code(connect_future) == CASS_OK) {
-    CassFuture* close_future = NULL;
-
     /* Build statement and execute query */
     string key = "first";
     string query = "SELECT " + key + " FROM " + keyspace + "." + table;
@@ -213,26 +177,14 @@ void get(string key){
       }
       cass_result_free(result);
     } else {
-      /* Handle error */
-      const char* message;
-      size_t message_length;
-      cass_future_error_message(result_future, &message, &message_length);
-      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+      error(result_future);
     }
 
     cass_statement_free(statement);
     cass_future_free(result_future);
-
-    /* Close the session */
-    close_future = cass_session_close(session);
-    cass_future_wait(close_future);
-    cass_future_free(close_future);
+    close();
   } else {
-    /* Handle error */
-    const char* message;
-    size_t message_length;
-    cass_future_error_message(connect_future, &message, &message_length);
-    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+    error(connect_future);
   }
 
   cass_future_free(connect_future);
@@ -240,20 +192,8 @@ void get(string key){
   cass_session_free(session);
 }
 void insert(string key, string value){
-  /* Setup and connect to cluster */
-  CassFuture* connect_future = NULL;
-  CassCluster* cluster = cass_cluster_new();
-  CassSession* session = cass_session_new();
-
-  /* Add contact points */
-  cass_cluster_set_contact_points(cluster, hosts);
-
-  /* Provide the cluster object as configuration to connect the session */
-  connect_future = cass_session_connect(session, cluster);
-
+  setup();
   if (cass_future_error_code(connect_future) == CASS_OK) {
-    CassFuture* close_future = NULL;
-
     /* Build statement and execute query */
     string query = "INSERT INTO " + keyspace + "." + table + " ( " + key + " ) VALUES ( '" + value + "' )";
     CassStatement* statement = cass_statement_new(query.c_str(), 0);
@@ -278,28 +218,15 @@ void insert(string key, string value){
       }
       cass_result_free(result);
     } else {
-      /* Handle error */
-      const char* message;
-      size_t message_length;
-      cass_future_error_message(result_future, &message, &message_length);
-      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+      error(result_future);
     }
 
     cass_statement_free(statement);
     cass_future_free(result_future);
-
-    /* Close the session */
-    close_future = cass_session_close(session);
-    cass_future_wait(close_future);
-    cass_future_free(close_future);
+    close();
   } else {
-    /* Handle error */
-    const char* message;
-    size_t message_length;
-    cass_future_error_message(connect_future, &message, &message_length);
-    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+    error(connect_future);
   }
-
   cass_future_free(connect_future);
   cass_cluster_free(cluster);
   cass_session_free(session);
@@ -310,6 +237,7 @@ int main(int argc, char ** argv)
 {
     while(1)
     {
+        setup();
         string prompt = ">";
         if(keyspace != "not set"){
           prompt = keyspace + ">";
@@ -365,7 +293,6 @@ int main(int argc, char ** argv)
             insert(result[1], result[2]);
           }
         }
-        /* Do something witcons the line here */
         free(line);
     }
 }
