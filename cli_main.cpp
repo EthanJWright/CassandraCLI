@@ -6,24 +6,307 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <cassandra.h>
+#include <iterator>
+#include <algorithm>
+
 
 using namespace std;
 
+string keyspace = "not set";
+string table = "not set";
+
 void show(){
-  cout<<"showing"<<endl;
+  cout<<"Keyspace List: "<<endl;
+  cout<<"----------------"<<endl;
+  /* Setup and connect to cluster */
+  CassFuture* connect_future = NULL;
+  CassCluster* cluster = cass_cluster_new();
+  CassSession* session = cass_session_new();
+  char* hosts = "127.0.0.1";
+
+  /* Add contact points */
+  cass_cluster_set_contact_points(cluster, hosts);
+
+  /* Provide the cluster object as configuration to connect the session */
+  connect_future = cass_session_connect(session, cluster);
+
+  if (cass_future_error_code(connect_future) == CASS_OK) {
+    CassFuture* close_future = NULL;
+
+    /* Build statement and execute query */
+//    const char* query = "SELECT release_version FROM system.local";
+    const char* query = "select * from system_schema.keyspaces";
+    CassStatement* statement = cass_statement_new(query, 0);
+
+    CassFuture* result_future = cass_session_execute(session, statement);
+
+    if (cass_future_error_code(result_future) == CASS_OK) {
+      /* Retrieve result set and get the first row */
+      const CassResult* result = cass_future_get_result(result_future);
+      const CassRow* row = cass_result_first_row(result);
+      CassIterator* iterator = cass_iterator_from_result(result);
+
+      while (cass_iterator_next(iterator)) {
+        const CassRow* row = cass_iterator_get_row(iterator);
+        const CassValue* value = cass_row_get_column_by_name(row, "keyspace_name");
+
+        const char* release_version;
+        size_t release_version_length;
+        cass_value_get_string(value, &release_version, &release_version_length);
+        string response(release_version);
+        cout<<response<<endl;
+      }
+      cass_result_free(result);
+    } else {
+      /* Handle error */
+      const char* message;
+      size_t message_length;
+      cass_future_error_message(result_future, &message, &message_length);
+      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+    }
+
+    cass_statement_free(statement);
+    cass_future_free(result_future);
+
+    /* Close the session */
+    close_future = cass_session_close(session);
+    cass_future_wait(close_future);
+    cass_future_free(close_future);
+  } else {
+    /* Handle error */
+    const char* message;
+    size_t message_length;
+    cass_future_error_message(connect_future, &message, &message_length);
+    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+  }
+
+  cass_future_free(connect_future);
+  cass_cluster_free(cluster);
+  cass_session_free(session);
 }
+
 void list(){
-  cout<<"listing"<<endl;
+  cout<<"Tables: "<<endl;
+  cout<<"-----------------"<<endl;  
+  /* Setup and connect to cluster */
+  CassFuture* connect_future = NULL;
+  CassCluster* cluster = cass_cluster_new();
+  CassSession* session = cass_session_new();
+  char* hosts = "127.0.0.1";
+  /* Add contact points */
+  cass_cluster_set_contact_points(cluster, hosts);
+
+  /* Provide the cluster object as configuration to connect the session */
+  connect_future = cass_session_connect(session, cluster);
+
+  if (cass_future_error_code(connect_future) == CASS_OK) {
+    CassFuture* close_future = NULL;
+
+    /* Build statement and execute query */
+    if(keyspace == "not set"){
+      cout<<"Keyspace not defined"<<endl;
+      return;
+    }
+    string query = "SELECT table_name FROM system_schema.columns WHERE keyspace_name = '" + keyspace + "'";
+    CassStatement* statement = cass_statement_new(query.c_str(), 0);
+
+    CassFuture* result_future = cass_session_execute(session, statement);
+
+    if (cass_future_error_code(result_future) == CASS_OK) {
+      /* Retrieve result set and get the first row */
+      const CassResult* result = cass_future_get_result(result_future);
+      const CassRow* row = cass_result_first_row(result);
+      CassIterator* iterator = cass_iterator_from_result(result);
+
+      std::vector<string> table_names;
+
+      while (cass_iterator_next(iterator)) {
+        const CassRow* row = cass_iterator_get_row(iterator);
+        const CassValue* value = cass_row_get_column_by_name(row, "table_name");
+
+        const char* release_version;
+        size_t release_version_length;
+        cass_value_get_string(value, &release_version, &release_version_length);
+        string name(release_version);
+        bool found = std::find(table_names.begin(), table_names.end(), name) != table_names.end();
+        if(!found){
+          table_names.push_back(name);
+        }
+      }
+      for(int i = 0; i < table_names.size(); i++){
+            // Create iterator pointing to first element
+        std::vector<std::string>::iterator it = table_names.begin();
+        std::advance(it, i);
+        cout << *it << endl;
+      }
+      cass_result_free(result);
+    } else {
+      /* Handle error */
+      const char* message;
+      size_t message_length;
+      cass_future_error_message(result_future, &message, &message_length);
+      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+    }
+
+    cass_statement_free(statement);
+    cass_future_free(result_future);
+
+    /* Close the session */
+    close_future = cass_session_close(session);
+    cass_future_wait(close_future);
+    cass_future_free(close_future);
+  } else {
+    /* Handle error */
+    const char* message;
+    size_t message_length;
+    cass_future_error_message(connect_future, &message, &message_length);
+    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+  }
+
+  cass_future_free(connect_future);
+  cass_cluster_free(cluster);
+  cass_session_free(session);
 }
-void use(string keyspace, string table){
+void use(string key, string tab){
+  keyspace = key;
+  table = tab;
   string response = "Using keyspace: " + keyspace + " and table: " + table;
   cout<<response<<endl;
 }
-void get(){
-  cout<<"getting"<<endl;
+void get(string key){
+  /* Setup and connect to cluster */
+  CassFuture* connect_future = NULL;
+  CassCluster* cluster = cass_cluster_new();
+  CassSession* session = cass_session_new();
+  char* hosts = "127.0.0.1";
+  /* Add contact points */
+  cass_cluster_set_contact_points(cluster, hosts);
+
+  /* Provide the cluster object as configuration to connect the session */
+  connect_future = cass_session_connect(session, cluster);
+
+  if (cass_future_error_code(connect_future) == CASS_OK) {
+    CassFuture* close_future = NULL;
+
+    /* Build statement and execute query */
+    string key = "first";
+    string query = "SELECT " + key + " FROM " + keyspace + "." + table;
+    cout << query << endl;
+    CassStatement* statement = cass_statement_new(query.c_str(), 0);
+
+    CassFuture* result_future = cass_session_execute(session, statement);
+
+    if (cass_future_error_code(result_future) == CASS_OK) {
+      /* Retrieve result set and get the first row */
+      const CassResult* result = cass_future_get_result(result_future);
+      const CassRow* row = cass_result_first_row(result);
+      CassIterator* iterator = cass_iterator_from_result(result);
+
+      while (cass_iterator_next(iterator)) {
+        const CassRow* row = cass_iterator_get_row(iterator);
+        const CassValue* value = cass_row_get_column_by_name(row, key.c_str());
+
+        const char* release_version;
+        size_t release_version_length;
+        cass_value_get_string(value, &release_version, &release_version_length);
+        printf("Values: '%.*s'\n", (int)release_version_length, release_version);
+
+      }
+      cass_result_free(result);
+    } else {
+      /* Handle error */
+      const char* message;
+      size_t message_length;
+      cass_future_error_message(result_future, &message, &message_length);
+      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+    }
+
+    cass_statement_free(statement);
+    cass_future_free(result_future);
+
+    /* Close the session */
+    close_future = cass_session_close(session);
+    cass_future_wait(close_future);
+    cass_future_free(close_future);
+  } else {
+    /* Handle error */
+    const char* message;
+    size_t message_length;
+    cass_future_error_message(connect_future, &message, &message_length);
+    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+  }
+
+  cass_future_free(connect_future);
+  cass_cluster_free(cluster);
+  cass_session_free(session);
 }
-void insert(){
-  cout<<"inserting"<<endl;
+void insert(string key, string value){
+  /* Setup and connect to cluster */
+  CassFuture* connect_future = NULL;
+  CassCluster* cluster = cass_cluster_new();
+  CassSession* session = cass_session_new();
+  char* hosts = "127.0.0.1";
+
+  /* Add contact points */
+  cass_cluster_set_contact_points(cluster, hosts);
+
+  /* Provide the cluster object as configuration to connect the session */
+  connect_future = cass_session_connect(session, cluster);
+
+  if (cass_future_error_code(connect_future) == CASS_OK) {
+    CassFuture* close_future = NULL;
+
+    /* Build statement and execute query */
+    string query = "INSERT INTO " + keyspace + "." + table + " ( " + key + " ) VALUES ( '" + value + "' )";
+    cout << query << endl;
+    CassStatement* statement = cass_statement_new(query.c_str(), 0);
+
+    CassFuture* result_future = cass_session_execute(session, statement);
+
+    if (cass_future_error_code(result_future) == CASS_OK) {
+      /* Retrieve result set and get the first row */
+      const CassResult* result = cass_future_get_result(result_future);
+      const CassRow* row = cass_result_first_row(result);
+      CassIterator* iterator = cass_iterator_from_result(result);
+
+      while (cass_iterator_next(iterator)) {
+        const CassRow* row = cass_iterator_get_row(iterator);
+        const CassValue* value = cass_row_get_column_by_name(row, "keyspace_name");
+
+        const char* release_version;
+        size_t release_version_length;
+        cass_value_get_string(value, &release_version, &release_version_length);
+        string response(release_version);
+        cout<<response<<endl;
+      }
+      cass_result_free(result);
+    } else {
+      /* Handle error */
+      const char* message;
+      size_t message_length;
+      cass_future_error_message(result_future, &message, &message_length);
+      fprintf(stderr, "Unable to run query: '%.*s'\n", (int)message_length, message);
+    }
+
+    cass_statement_free(statement);
+    cass_future_free(result_future);
+
+    /* Close the session */
+    close_future = cass_session_close(session);
+    cass_future_wait(close_future);
+    cass_future_free(close_future);
+  } else {
+    /* Handle error */
+    const char* message;
+    size_t message_length;
+    cass_future_error_message(connect_future, &message, &message_length);
+    fprintf(stderr, "Unable to connect: '%.*s'\n", (int)message_length, message);
+  }
+
+  cass_future_free(connect_future);
+  cass_cluster_free(cluster);
+  cass_session_free(session);
 }
 
 
@@ -31,7 +314,11 @@ int main(int argc, char ** argv)
 {
     while(1)
     {
-        char * line = readline("> ");
+        string prompt = ">";
+        if(keyspace != "not set"){
+          prompt = keyspace + ">";
+        }
+        char * line = readline(prompt.c_str());
         if(!line) break;
         if(*line) add_history(line);
         string entered(line);
@@ -55,7 +342,7 @@ int main(int argc, char ** argv)
           }
         }if(result.size() == 2){
           if(result[0] == "get"){
-            get();
+            get(result[0]);
           }
           if(result[0] == "use"){
             // Split with the '.'
@@ -72,7 +359,7 @@ int main(int argc, char ** argv)
           }
         }if(result.size() == 3){
           if(result[0] == "insert"){
-            insert();
+            insert(result[1], result[2]);
           }
         }
         /* Do something witcons the line here */
