@@ -15,6 +15,7 @@ using namespace std;
 
 string keyspace = "not set";
 string table = "not set";
+char* hosts = (char *)"127.0.0.1";
 
 void show(){
   cout<<"Keyspace List: "<<endl;
@@ -23,7 +24,6 @@ void show(){
   CassFuture* connect_future = NULL;
   CassCluster* cluster = cass_cluster_new();
   CassSession* session = cass_session_new();
-  char* hosts = "127.0.0.1";
 
   /* Add contact points */
   cass_cluster_set_contact_points(cluster, hosts);
@@ -35,7 +35,6 @@ void show(){
     CassFuture* close_future = NULL;
 
     /* Build statement and execute query */
-//    const char* query = "SELECT release_version FROM system.local";
     const char* query = "select * from system_schema.keyspaces";
     CassStatement* statement = cass_statement_new(query, 0);
 
@@ -88,12 +87,11 @@ void show(){
 
 void list(){
   cout<<"Tables: "<<endl;
-  cout<<"-----------------"<<endl;  
+  cout<<"-----------------"<<endl;
   /* Setup and connect to cluster */
   CassFuture* connect_future = NULL;
   CassCluster* cluster = cass_cluster_new();
   CassSession* session = cass_session_new();
-  char* hosts = "127.0.0.1";
   /* Add contact points */
   cass_cluster_set_contact_points(cluster, hosts);
 
@@ -175,11 +173,12 @@ void use(string key, string tab){
   cout<<response<<endl;
 }
 void get(string key){
+  cout<<"Values for key: "<<endl;
+  cout<<"--------------"<<endl;
   /* Setup and connect to cluster */
   CassFuture* connect_future = NULL;
   CassCluster* cluster = cass_cluster_new();
   CassSession* session = cass_session_new();
-  char* hosts = "127.0.0.1";
   /* Add contact points */
   cass_cluster_set_contact_points(cluster, hosts);
 
@@ -192,7 +191,6 @@ void get(string key){
     /* Build statement and execute query */
     string key = "first";
     string query = "SELECT " + key + " FROM " + keyspace + "." + table;
-    cout << query << endl;
     CassStatement* statement = cass_statement_new(query.c_str(), 0);
 
     CassFuture* result_future = cass_session_execute(session, statement);
@@ -210,8 +208,8 @@ void get(string key){
         const char* release_version;
         size_t release_version_length;
         cass_value_get_string(value, &release_version, &release_version_length);
-        printf("Values: '%.*s'\n", (int)release_version_length, release_version);
-
+        string ret_value(release_version);
+        cout<<ret_value<<endl;
       }
       cass_result_free(result);
     } else {
@@ -246,7 +244,6 @@ void insert(string key, string value){
   CassFuture* connect_future = NULL;
   CassCluster* cluster = cass_cluster_new();
   CassSession* session = cass_session_new();
-  char* hosts = "127.0.0.1";
 
   /* Add contact points */
   cass_cluster_set_contact_points(cluster, hosts);
@@ -259,7 +256,6 @@ void insert(string key, string value){
 
     /* Build statement and execute query */
     string query = "INSERT INTO " + keyspace + "." + table + " ( " + key + " ) VALUES ( '" + value + "' )";
-    cout << query << endl;
     CassStatement* statement = cass_statement_new(query.c_str(), 0);
 
     CassFuture* result_future = cass_session_execute(session, statement);
@@ -341,6 +337,13 @@ int main(int argc, char ** argv)
             list();
           }
         }if(result.size() == 2){
+            if(result[0] == "list"){
+              if(keyspace == "not set"){
+                keyspace = result[1];
+                list();
+                keyspace = "not set";
+              }
+          }
           if(result[0] == "get"){
             get(result[0]);
           }
