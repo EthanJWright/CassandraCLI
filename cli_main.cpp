@@ -104,8 +104,7 @@ void list(){
       const CassRow* row = cass_result_first_row(result);
       CassIterator* iterator = cass_iterator_from_result(result);
 
-      std::vector<string> table_names;
-
+      vector<string> table_names;
       while (cass_iterator_next(iterator)) {
         const CassRow* row = cass_iterator_get_row(iterator);
         const CassValue* value = cass_row_get_column_by_name(row, "table_name");
@@ -114,13 +113,14 @@ void list(){
         size_t release_version_length;
         cass_value_get_string(value, &release_version, &release_version_length);
         string name(release_version);
-        bool found = std::find(table_names.begin(), table_names.end(), name) != table_names.end();
-        if(!found){
-          table_names.push_back(name);
-        }
+        table_names.push_back(name);
       }
+//      table_names.unique();
+      vector<string>::iterator it;
+      it = unique(table_names.begin(), table_names.end());
+      table_names.resize(distance(table_names.begin(),it));
       for(int i = 0; i < table_names.size(); i++){
-            // Create iterator pointing to first element
+        // Create iterator pointing to first element
         std::vector<std::string>::iterator it = table_names.begin();
         std::advance(it, i);
         cout << *it << endl;
@@ -149,11 +149,10 @@ void use(string key, string tab){
 }
 void get(string key){
   setup();
-  cout<<"Values for key: "<<endl;
+  cout<<"Values for key: " + key<<endl;
   cout<<"--------------"<<endl;
   if (cass_future_error_code(connect_future) == CASS_OK) {
     /* Build statement and execute query */
-    string key = "first";
     string query = "SELECT " + key + " FROM " + keyspace + "." + table;
     CassStatement* statement = cass_statement_new(query.c_str(), 0);
 
@@ -238,7 +237,7 @@ int main(int argc, char ** argv)
     while(1)
     {
         setup();
-        string prompt = ">";
+        string prompt = "cassandra>";
         if(keyspace != "not set"){
           prompt = keyspace + ">";
         }
@@ -273,7 +272,7 @@ int main(int argc, char ** argv)
               }
           }
           if(result[0] == "get"){
-            get(result[0]);
+            get(result[1]);
           }
           if(result[0] == "use"){
             // Split with the '.'
@@ -285,8 +284,9 @@ int main(int argc, char ** argv)
               getline( ss, substr, '.' );
               split.push_back( substr );
             }
-            // call use
-            use(split[0], split[1]);
+            if(split.size() == 2){
+              use(split[0], split[1]);
+            }
           }
         }if(result.size() == 3){
           if(result[0] == "insert"){
